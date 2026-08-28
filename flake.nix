@@ -39,11 +39,6 @@
         modules = [
           self.nixosModules.mcserver
           {
-            # dummy hardware config so `nix flake check` / deploy-rs checks
-            # can evaluate; the real machine provides its own
-            fileSystems."/".device = "/dev/disk/by-label/nixos";
-            fileSystems."/".fsType = "ext4";
-            boot.loader.grub.devices = [ "/dev/vda" ];
             services.mcserver.enable = true;
           }
         ];
