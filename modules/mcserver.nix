@@ -90,6 +90,26 @@ let
     ${pkgs.coreutils}/bin/timeout 15 ${pkgs.coreutils}/bin/echo stop > /run/mcserver/stdin || true
   '';
 
+  # Health check: block the start job until the server is actually listening
+  # on its port (i.e. reached "Done" after loading all mods). If it fails,
+  # the unit is marked failed, which fails `switch-to-configuration` and
+  # triggers deploy-rs auto/magic rollback.
+  mcHealthCheck = pkgs.writeShellScript "mcserver-healthcheck" ''
+    DEADLINE=$(( $(date +%s) + ${toString cfg.healthTimeout} ))
+    while true; do
+      if ${pkgs.iproute2}/bin/ss -tln | grep -q ":${toString cfg.port} "; then
+        echo "mcserver is healthy (listening on port ${toString cfg.port})"
+        exit 0
+      fi
+      if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+        echo "mcserver FAILED health check: not listening on port ${toString cfg.port} within ${toString cfg.healthTimeout}s"
+        ${pkgs.systemd}/bin/journalctl -u mcserver -n 50 --no-pager || true
+        exit 1
+      fi
+      sleep 5
+    done
+  '';
+
   mcBackup = pkgs.writeShellScript "mcserver-backup" ''
     set -eu
 
@@ -169,6 +189,17 @@ in
       '';
     };
 
+    healthTimeout = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 600;
+      description = ''
+        Seconds to wait for the server to start listening on its port after
+        launch (modded servers take minutes to load). If exceeded, the unit
+        is marked failed — blocking a NixOS switch and triggering a deploy-rs
+        rollback. Make sure this is less than deploy-rs activationTimeout.
+      '';
+    };
+
     port = lib.mkOption {
       type = lib.types.port;
       default = 25565;
@@ -235,6 +266,7 @@ in
         RuntimeDirectory = "mcserver";
         ExecStartPre = "${mcPreStart}";
         ExecStart = "${mcStart}";
+        ExecStartPost = "${mcHealthCheck}";
         ExecStop = "${mcStop}";
         Restart = if cfg.autoRestart then "always" else "no";
         RestartSec = 10;

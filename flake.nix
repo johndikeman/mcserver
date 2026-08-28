@@ -39,6 +39,11 @@
         modules = [
           self.nixosModules.mcserver
           {
+            # dummy hardware config so `nix flake check` / deploy-rs checks
+            # can evaluate; the real machine provides its own
+            fileSystems."/".device = "/dev/disk/by-label/nixos";
+            fileSystems."/".fsType = "ext4";
+            boot.loader.grub.devices = [ "/dev/vda" ];
             services.mcserver.enable = true;
           }
         ];
@@ -47,8 +52,14 @@
       deploy.nodes.mcserver = {
         # Fill in the target host when deploying
         hostname = "localhost";
+        autoRollback = true;
+        magicRollback = true;
         profiles.system = {
           user = "root";
+          # activation blocks until the mcserver health check passes, so this
+          # must exceed services.mcserver.healthTimeout (600s default)
+          activationTimeout = 900;
+          waitsFor = "systemd-switch";
           path = deploy-rs.lib.${system}.activate.nixos self.nixosConfigurations.mcserver-test;
         };
       };
