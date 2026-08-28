@@ -57,6 +57,13 @@ let
       printf 'allow-flight=true\nmotd=All the Mods 10 Aeronautics\nmax-tick-time=180000' > server.properties
     fi
 
+    # Accept the Minecraft EULA so the server doesn't refuse to start
+    ${lib.optionalString cfg.acceptEula ''
+      if [ "$(cat eula.txt 2>/dev/null || true)" != "eula=true" ]; then
+        printf 'eula=true' > eula.txt
+      fi
+    ''}
+
     # stdin FIFO: lets us send console commands (like "stop") to the server
     # for graceful shutdown from ExecStop.
     rm -f /run/mcserver/stdin
@@ -150,6 +157,16 @@ in
       type = lib.types.str;
       default = "0.5.1";
       description = "Version tag of the server pack. Changing it triggers a re-download.";
+    };
+
+    acceptEula = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Write eula=true to eula.txt in dataDir so the server is allowed to
+        start. By enabling the server you agree to the Minecraft EULA
+        (https://aka.ms/MinecraftEULA).
+      '';
     };
 
     port = lib.mkOption {
