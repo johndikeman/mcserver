@@ -200,6 +200,23 @@ in
       '';
     };
 
+    maxRestarts = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 5;
+      description = ''
+        Maximum number of automatic restarts within restartInterval before
+        systemd gives up and leaves the unit in a failed state (instead of
+        crash-looping forever). Set high enough that an in-game `stop` at the
+        wrong moment can't exhaust it.
+      '';
+    };
+
+    restartInterval = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 1800;
+      description = "Time window (seconds) that maxRestarts applies to.";
+    };
+
     port = lib.mkOption {
       type = lib.types.port;
       default = 25565;
@@ -258,6 +275,14 @@ in
       wantedBy = [ "multi-user.target" ];
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
+
+      # Give up after maxRestarts within restartInterval instead of
+      # crash-looping forever; unit ends up in a failed state that's easy to
+      # spot (and roll back from).
+      unitConfig = {
+        StartLimitIntervalSec = cfg.restartInterval;
+        StartLimitBurst = cfg.maxRestarts;
+      };
 
       serviceConfig = {
         User = cfg.user;
