@@ -1,0 +1,16 @@
+nixos module in a flake that will:
+
+- setup + run the minecraft server
+- be deployable with deploy-rs
+- configurable autorestart
+- setup networking (port 25565)
+- configurable periodic autorestart
+- automatic world backup script (run hourly, save a weeks worth?)
+
+I'm thinking the best way to do this would be setup a podman container and run it with oci-containers nixos, but I'm unsure 
+the "johndikeman/mcserver2024" repo shows how i did a dockerfile for modded minecraft two years ago
+I downloaded + unzipped the server file in this directory
+
+https://search.nixos.org/options?channel=unstable&query=virtualisation.oci-containers.containers&type=options
+https://www.curseforge.com/minecraft/modpacks/all-the-mods-10-aeronautics
+
