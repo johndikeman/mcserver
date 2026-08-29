@@ -32,11 +32,12 @@ let
       INSTALLED_VERSION=$(${pkgs.coreutils}/bin/cat .pack-version 2>/dev/null || true)
       if [ "$INSTALLED_VERSION" != "${cfg.serverPackVersion}" ]; then
         echo "Fetching server pack ${cfg.serverPackVersion} (have: ''${INSTALLED_VERSION:-none})"
-        ${pkgs.curl}/bin/curl -fL --retry 5 -o pack.zip "${cfg.serverPackUrl}"
-        # Unpack over the existing directory; config/mods etc are overwritten,
-        # world/ and other runtime state are not part of the pack.
-        ${pkgs.unzip}/bin/unzip -o pack.zip -d .
-        rm -f pack.zip
+        # Download to a .part file with resume support (-C -): slow
+        # connections and service restarts continue the download instead
+        # of starting over.
+        ${pkgs.curl}/bin/curl -fL --retry 5 -C - -o pack.zip.part "${cfg.serverPackUrl}"
+        ${pkgs.unzip}/bin/unzip -o pack.zip.part -d .
+        rm -f pack.zip.part
         echo "${cfg.serverPackVersion}" > .pack-version
       fi
     ''}
@@ -200,6 +201,17 @@ in
       '';
     };
 
+    startupTimeout = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 3600;
+      description = ''
+        systemd TimeoutStartSec for the unit. This covers ExecStartPre
+        (downloading the server pack and installing NeoForge — potentially
+        hundreds of MB over a slow connection) plus the main start job.
+        Must be >= healthTimeout.
+      '';
+    };
+
     maxRestarts = lib.mkOption {
       type = lib.types.ints.positive;
       default = 5;
@@ -298,6 +310,10 @@ in
         RestartSec = 10;
         # Modded servers eat memory; give it plenty before OOM'ing it
         MemoryMax = "20G";
+        # Generous start timeout: ExecStartPre may download the whole
+        # server pack (~800MB) on a slow connection. systemd's default
+        # 90s TimeoutStartUSec otherwise kills curl mid-download.
+        TimeoutStartSec = cfg.startupTimeout;
         # "stop" via stdin is the graceful path; these are last-resort.
         KillSignal = "SIGTERM";
         KillMode = "mixed"; # SIGTERM the java main process first
