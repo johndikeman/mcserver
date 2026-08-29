@@ -269,6 +269,7 @@ in
   config = lib.mkIf cfg.enable {
     # Open the Minecraft port
     networking.firewall.allowedTCPPorts = [ cfg.port ];
+    networking.firewall.allowedUDPPorts = [ 24454 ];
 
     systemd.services.mcserver = {
       description = "All the Mods 10 Aeronautics Minecraft server";
