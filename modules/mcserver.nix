@@ -165,12 +165,20 @@ let
   # on its port (i.e. reached "Done" after loading all mods). If it fails,
   # the unit is marked failed, which fails `switch-to-configuration` and
   # triggers deploy-rs auto/magic rollback.
+  #
+  # After the server is healthy, apply the configured operators through the
+  # console FIFO. We can't rely solely on writing ops.json from the
+  # pre-start: the server (and a dying previous instance during graceful
+  # shutdown) re-saves ops.json from its in-memory list, which can clobber
+  # our file. Console `op` commands mutate the live server and are
+  # persisted by the server itself.
   mcHealthCheck = pkgs.writeShellScript "mcserver-healthcheck" ''
     DEADLINE=$(( $(date +%s) + ${toString cfg.healthTimeout} ))
     while true; do
       if ${pkgs.iproute2}/bin/ss -tln | grep -q ":${toString cfg.port} "; then
         echo "mcserver is healthy (listening on port ${toString cfg.port})"
-        exit 0
+        exit_code=0
+        break
       fi
       if [ "$(date +%s)" -ge "$DEADLINE" ]; then
         echo "mcserver FAILED health check: not listening on port ${toString cfg.port} within ${toString cfg.healthTimeout}s"
@@ -179,6 +187,12 @@ let
       fi
       sleep 5
     done
+
+    ${lib.concatMapStrings (o: ''
+      echo "op ${o.name}" > /run/mcserver/stdin 2>/dev/null || \
+        echo "WARNING: could not send 'op ${o.name}' to server console"
+    '') cfg.ops}
+    exit $exit_code
   '';
 
   mcBackup = pkgs.writeShellScript "mcserver-backup" ''
@@ -337,10 +351,12 @@ in
         { name = "Cameron"; level = 3; }
       ];
       description = ''
-        Players granted operator status. Written to ops.json in dataDir on
-        startup; usernames are resolved to uuids via the Mojang API
-        (results cached in .ops-resolved.json). Requires internet access at
-        startup — provide `uuid` explicitly for fully offline setups.
+        Players granted operator status. Applied via the server console
+        (`op <name>`) once the server is up, which updates both the running
+        server and ops.json. Usernames are resolved to uuids via the
+        Mojang API when written to ops.json (results cached in
+        .ops-resolved.json). Requires internet access — provide `uuid`
+        explicitly for fully offline setups.
       '';
     };
 
@@ -427,7 +443,9 @@ in
         RuntimeDirectory = "mcserver";
         ExecStartPre = "${mcPreStart}";
         ExecStart = "${mcStart}";
-        ExecStartPost = "${mcHealthCheck}";
+        # Keep ExecStartPre simple: it only stages server files + ops.json.
+      # Operators are applied via console in ExecStartPost (see above).
+      ExecStartPost = [ "${mcHealthCheck}" ];
         ExecStop = "${mcStop}";
         Restart = if cfg.autoRestart then "always" else "no";
         RestartSec = 10;
