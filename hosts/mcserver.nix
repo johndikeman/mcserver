@@ -50,7 +50,10 @@
     enable = true;
     networks."10-lan" = {
       # DHCP on every wired interface; fine for a home server
-      matchConfig.Name = [ "en*" "eth*" ];
+      matchConfig.Name = [
+        "en*"
+        "eth*"
+      ];
       networkConfig.DHCP = "yes";
     };
   };
