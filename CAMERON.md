@@ -51,56 +51,7 @@ Re-test login from the other terminal (and that you can still get in).
 ⚠️ If you get locked out, most distros keep `sshd_config.d/` overrides —
 check `sudo grep -r PasswordAuthentication /etc/ssh/sshd_config.d/` too.
 
-## 2. Port forwarding on the router (Spectrum)
-
-Spectrum home internet puts you behind CGNAT-ish gear, but with their
-router (or your own router on a Spectrum connection):
-
-1. Find the server's LAN IP: `ip addr` — note it, e.g. `192.168.1.50`.
-   Better: reserve it as a static DHCP lease in the router admin panel.
-2. Log into the router admin page — usually `http://192.168.1.1`
-   (Spectrum/Charter routers often use `admin` / the password printed on
-   the router sticker).
-3. Find **Port Forwarding** (sometimes under Advanced / NAT / Gaming).
-4. Add two rules:
-
-| Name        | External port | Internal IP    | Internal port | Protocol |
-|-------------|---------------|----------------|---------------|----------|
-| SSH         | 22            | 192.168.1.50   | 22            | TCP      |
-| Minecraft   | 25565         | 192.168.1.50   | 25565         | TCP      |
-
-(Use the server's actual LAN IP in place of 192.168.1.50. Feel free to
-pick a different *external* port for SSH, e.g. 2222 → 22, if you'd rather
-not expose 22 — just tell John which one.)
-
-5. Some Spectrum routers have an option like "WiFi Router Mode / Bridge
-   mode" — leave normal routing mode on; bridge mode would disable
-   port forwarding.
-
-Once forwarded, test from a phone on cellular: try connecting to your
-public IP (whatismyip.com) on port 22 / the MC port.
-
-## 3. What happens next
-
-John will run `nixos-anywhere` over SSH, which **wipes the disk and
-installs NixOS** with the Minecraft server config. After that:
-
-- SSH access is via John's key baked into the NixOS config (your account
-  config above becomes irrelevant; John will make sure you still have
-  access on the NixOS side if you want it — send him a public key).
-- The Minecraft server runs as a systemd service, auto-restarts, and
-  backs up the world hourly.
-- A Github Action will re-deploy the server on push to the github repo johndikeman/mcserver.
-  
-
-One thing John needs from you:
-
-- [ ] server's LAN IP 
-- [ ] which external SSH port you chose (if not 22)
-- [ ] your public IP 
-- [ ] the disk the OS should go on (see below)
-
-## Finding the name of the disk
+## 2. Finding the name of the disk
 
 The installer is going to wipe exactly one disk, so we need its device
 name. SSH into the server and run:
@@ -141,3 +92,52 @@ serial number — that's what we'll actually put in the config, since it
 points at one specific physical drive and can't be confused with another.
 
 **John will confirm the disk with you before wiping anything.**
+## 3. Port forwarding on the router (Spectrum)
+
+Spectrum home internet puts you behind CGNAT-ish gear, but with their
+router (or your own router on a Spectrum connection):
+
+1. Find the server's LAN IP: `ip addr` — note it, e.g. `192.168.1.50`.
+   Better: reserve it as a static DHCP lease in the router admin panel.
+2. Log into the router admin page — usually `http://192.168.1.1`
+   (Spectrum/Charter routers often use `admin` / the password printed on
+   the router sticker).
+3. Find **Port Forwarding** (sometimes under Advanced / NAT / Gaming).
+4. Add two rules:
+
+| Name        | External port | Internal IP    | Internal port | Protocol |
+|-------------|---------------|----------------|---------------|----------|
+| SSH         | 22            | 192.168.1.50   | 22            | TCP      |
+| Minecraft   | 25565         | 192.168.1.50   | 25565         | TCP      |
+
+(Use the server's actual LAN IP in place of 192.168.1.50. Feel free to
+pick a different *external* port for SSH, e.g. 2222 → 22, if you'd rather
+not expose 22 — just tell John which one.)
+
+5. Some Spectrum routers have an option like "WiFi Router Mode / Bridge
+   mode" — leave normal routing mode on; bridge mode would disable
+   port forwarding.
+
+Once forwarded, test from a phone on cellular: try connecting to your
+public IP (whatismyip.com) on port 22 / the MC port.
+
+## 4. What happens next
+
+John will run `nixos-anywhere` over SSH, which **wipes the disk and
+installs NixOS** with the Minecraft server config. After that:
+
+- SSH access is via John's key baked into the NixOS config (your account
+  config above becomes irrelevant; John will make sure you still have
+  access on the NixOS side if you want it — send him a public key).
+- The Minecraft server runs as a systemd service, auto-restarts, and
+  backs up the world hourly.
+- A Github Action will re-deploy the server on push to the github repo johndikeman/mcserver.
+  
+
+One thing John needs from you:
+
+- [ ] server's LAN IP 
+- [ ] which external SSH port you chose (if not 22)
+- [ ] your public IP 
+- [ ] the disk the OS should go on (see below)
+
