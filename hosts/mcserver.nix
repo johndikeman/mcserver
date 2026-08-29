@@ -60,6 +60,7 @@
   networking.firewall = {
     enable = true;
     allowedTCPPorts = [ 22 ];
+    allowedUDPPorts = [ 24454 ];
     # 25565 opened by services.mcserver
   };
 
