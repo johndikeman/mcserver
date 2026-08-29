@@ -92,6 +92,7 @@ serial number — that's what we'll actually put in the config, since it
 points at one specific physical drive and can't be confused with another.
 
 **John will confirm the disk with you before wiping anything.**
+
 ## 3. Port forwarding on the router (Spectrum)
 
 Spectrum home internet puts you behind CGNAT-ish gear, but with their
