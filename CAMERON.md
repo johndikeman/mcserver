@@ -77,17 +77,6 @@ not expose 22 — just tell John which one.)
    mode" — leave normal routing mode on; bridge mode would disable
    port forwarding.
 
-### Home IP changes (DDNS)
-
-Residential IPs change every so often. Easiest fix: set up a free DDNS
-hostname so John always reaches the box. Two easy options:
-
-- Many Spectrum routers have a built-in **DDNS** page (No-IP or DynDNS) —
-  create a free account at noip.com, add a hostname, enter creds in the
-  router.
-- Or we can handle it in NixOS after the install (a tiny `ddclient`
-  service) — tell John you'd prefer that and he'll set it up.
-
 Once forwarded, test from a phone on cellular: try connecting to your
 public IP (whatismyip.com) on port 22 / the MC port.
 
@@ -101,13 +90,54 @@ installs NixOS** with the Minecraft server config. After that:
   access on the NixOS side if you want it — send him a public key).
 - The Minecraft server runs as a systemd service, auto-restarts, and
   backs up the world hourly.
-- John deploys updates remotely with `deploy-rs`; you shouldn't need to
-  touch anything.
+- A Github Action will re-deploy the server on push to the github repo johndikeman/mcserver.
+  
 
 One thing John needs from you:
 
-- [ ] confirmation John's key works (before password auth is disabled)
-- [ ] server's LAN IP (and whether you reserved it)
+- [ ] server's LAN IP 
 - [ ] which external SSH port you chose (if not 22)
-- [ ] your public IP or a DDNS hostname
-- [ ] the disk the OS should go on (John will confirm before wiping)
+- [ ] your public IP 
+- [ ] the disk the OS should go on (see below)
+
+## Finding the name of the disk
+
+The installer is going to wipe exactly one disk, so we need its device
+name. SSH into the server and run:
+
+```bash
+lsblk -o NAME,SIZE,MODEL,TYPE,MOUNTPOINTS
+```
+
+You'll see something like:
+
+```
+NAME        SIZE MODEL            TYPE MOUNTPOINTS
+nvme0n1   476.9G Samsung SSD 970  disk
+├─nvme0n1p1   1G                  part /boot/efi
+├─nvme0n1p2 100G                  part /
+└─nvme0n1p3 375G                  part /home
+sda         931.5G WDC WD10EZEX     disk
+```
+
+The disk we want is the line with `TYPE = disk` that **has the root
+(`/`) partition under it** — in the example above that's `nvme0n1` (not
+`sda`, which is a spare data drive, and not the `part` lines, which are
+partitions *on* the disk).
+
+Note down:
+- the **name** (`nvme0n1` or `sda` — NVMe drives start with `nvme`, SATA drives are `sda`, `sdb`, ...)
+- the **size and model**, so we can sanity-check it's the right drive
+
+If it's ambiguous (multiple disks, or nothing mounted at `/`), send John
+the full `lsblk` output plus:
+
+```bash
+ls -l /dev/disk/by-id/ | grep -v part
+```
+
+Those `by-id` names (e.g. `nvme-Samsung_SSD_970_ABC123`) include the
+serial number — that's what we'll actually put in the config, since it
+points at one specific physical drive and can't be confused with another.
+
+**John will confirm the disk with you before wiping anything.**
