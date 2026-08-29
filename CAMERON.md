@@ -9,6 +9,8 @@ with `nixos-anywhere` — **anything currently on the disk will be erased**,
 so copy off anything you care about first.
 
 ---
+## 0. turn the thing on connect it to physical ethernet log into your router and note the ip of the box via the clients page
+## 0.1 find the credentials to the server i don't remember them but i remember a post it note...
 
 ## 1. Add John's SSH key and disable password logins
 
@@ -140,5 +142,5 @@ One thing John needs from you:
 - [ ] server's LAN IP 
 - [ ] which external SSH port you chose (if not 22)
 - [ ] your public IP 
-- [ ] the disk the OS should go on (see below)
+- [ ] the disk the OS should go on 
 
