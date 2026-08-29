@@ -9,6 +9,10 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     deploy-rs = {
       url = "github:serokell/deploy-rs";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -19,6 +23,7 @@
     {
       self,
       nixpkgs,
+      disko,
       deploy-rs,
       ...
     }:
@@ -33,20 +38,19 @@
       nixosModules.mcserver = import ./modules/mcserver.nix;
       nixosModules.default = self.nixosModules.mcserver;
 
-      # Example nixosConfiguration wiring the module in, for testing
-      nixosConfigurations.mcserver-test = nixpkgs.lib.nixosSystem {
+      # The actual box (Cameron's server). Installs with nixos-anywhere:
+      #   nixos-anywhere --flake .#mcserver root@<host>
+      nixosConfigurations.mcserver = nixpkgs.lib.nixosSystem {
         inherit system;
         modules = [
-          self.nixosModules.mcserver
-          {
-            services.mcserver.enable = true;
-          }
+          disko.nixosModules.default
+          ./hosts/mcserver.nix
         ];
       };
 
       deploy.nodes.mcserver = {
-        # Fill in the target host when deploying
-        hostname = "localhost";
+        # Cameron's public IP or hostname (see DDNS note in CAMERON.md)
+        hostname = "FILL_ME_IN";
         autoRollback = true;
         magicRollback = true;
         profiles.system = {
@@ -55,7 +59,7 @@
           # must exceed services.mcserver.healthTimeout (600s default)
           activationTimeout = 900;
           waitsFor = "systemd-switch";
-          path = deploy-rs.lib.${system}.activate.nixos self.nixosConfigurations.mcserver-test;
+          path = deploy-rs.lib.${system}.activate.nixos self.nixosConfigurations.mcserver;
         };
       };
 
