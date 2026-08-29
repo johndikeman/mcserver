@@ -28,10 +28,73 @@ let
     mkdir -p ${cfg.dataDir}
     cd ${cfg.dataDir}
 
+    ${lib.optionalString (cfg.ops != [ ]) ''
+      # Write ops.json from the configured operator list. Entries without a
+      # uuid are resolved via the Mojang API (names may change; uuid is
+      # cached in .ops-resolved.json so this only hits the API once).
+      OPS_TMP=ops.json.tmp
+      printf '[]' > "$OPS_TMP"
+      add_op() {
+        NAME="$1" UUID="$2" LEVEL="$3" BYP="$4"
+        if [ -z "$UUID" ]; then
+          CACHED=$(${pkgs.jq}/bin/jq -r --arg n "$NAME" '.[$n] // empty' .ops-resolved.json 2>/dev/null || true)
+          if [ -n "$CACHED" ]; then
+            UUID="$CACHED"
+          else
+            # Current Mojang profile lookup endpoint (api.mojang.com
+            # user profiles is deprecated/404s). Returns the uuid dashed.
+            ID=$(${pkgs.curl}/bin/curl -fsS --retry 3 "https://api.minecraftservices.com/minecraft/profile/lookup/name/$NAME" | ${pkgs.jq}/bin/jq -r .id || true)
+            if [ -z "$ID" ]; then
+              echo "WARNING: could not resolve uuid for op '$NAME', skipping"
+              return 0
+            fi
+            UUID="$ID"
+            ${pkgs.jq}/bin/jq --arg n "$NAME" --arg u "$UUID" '. + {($n): $u}' .ops-resolved.json 2>/dev/null > .ops-resolved.json.new \
+              || printf '{"%s":"%s"}' "$NAME" "$UUID" > .ops-resolved.json.new
+            mv .ops-resolved.json.new .ops-resolved.json
+          fi
+        fi
+        ${pkgs.jq}/bin/jq --arg u "$UUID" --arg n "$NAME" --argjson l "$LEVEL" --argjson b "$BYP" \
+          '. + [{uuid: $u, name: $n, level: $l, bypassesPlayerLimit: $b}]' "$OPS_TMP" > "$OPS_TMP.new"
+        mv "$OPS_TMP.new" "$OPS_TMP"
+      }
+      ${lib.concatMapStrings (
+        o:
+        let
+          level = if o.level == null then 4 else o.level;
+        in
+        ''
+        add_op '${o.name}' '${if o.uuid == null then "" else o.uuid}' '${toString level}' '${if o.bypassesPlayerLimit then "true" else "false"}'
+      '') cfg.ops}
+      # Only replace ops.json if we resolved everything (avoids wiping the
+      # file when the Mojang API is down)
+      N_WANTED=${toString (builtins.length cfg.ops)}
+      N_GOT=$(${pkgs.jq}/bin/jq length "$OPS_TMP")
+      if [ "$N_GOT" -eq "$N_WANTED" ]; then
+        mv "$OPS_TMP" ops.json
+      else
+        echo "WARNING: resolved $N_GOT/$N_WANTED ops, leaving existing ops.json untouched"
+        rm -f "$OPS_TMP"
+      fi
+    ''}
+
     ${lib.optionalString (cfg.serverPackUrl != null) ''
       INSTALLED_VERSION=$(${pkgs.coreutils}/bin/cat .pack-version 2>/dev/null || true)
       if [ "$INSTALLED_VERSION" != "${cfg.serverPackVersion}" ]; then
         echo "Fetching server pack ${cfg.serverPackVersion} (have: ''${INSTALLED_VERSION:-none})"
+
+        # Snapshot the world before touching anything (the Updating guide's
+        # "BACKUP world before proceeding").
+        if [ -d world ]; then
+          ${mcBackup} || echo "WARNING: pre-update backup failed, continuing"
+        fi
+
+        # Per the ATM updating guide: remove pack-managed folders before
+        # extracting the new pack so files removed upstream don't linger.
+        # Runtime state (world/, local/, journeymap/, ops.json,
+        # server.properties, eula.txt) is left untouched.
+        rm -rf mods config kubejs defaultconfigs
+
         # Download to a .part file with resume support (-C -): slow
         # connections and service restarts continue the download instead
         # of starting over.
@@ -45,6 +108,12 @@ let
     INSTALLER="neoforge-${cfg.neoforgeVersion}-installer.jar"
     NEOFORGE_URL="https://maven.neoforged.net/releases/net/neoforged/neoforge/${cfg.neoforgeVersion}/neoforge-${cfg.neoforgeVersion}-installer.jar"
 
+    LOADED_LOADER=$(${pkgs.coreutils}/bin/cat .loader-version 2>/dev/null || true)
+    if [ -d libraries ] && [ "$LOADED_LOADER" != "${cfg.neoforgeVersion}" ]; then
+      echo "NeoForge loader changed ($LOADED_LOADER -> ${cfg.neoforgeVersion}), reinstalling"
+      rm -rf libraries
+    fi
+
     if [ ! -d libraries ]; then
       echo "NeoForge not installed, installing now."
       if [ ! -f "$INSTALLER" ]; then
@@ -53,6 +122,7 @@ let
       fi
       ${java}/bin/java -jar "$INSTALLER" -installServer
     fi
+    echo "${cfg.neoforgeVersion}" > .loader-version
 
     if [ ! -e server.properties ]; then
       printf 'allow-flight=true\nmotd=All the Mods 10 Aeronautics\nmax-tick-time=180000' > server.properties
@@ -117,11 +187,16 @@ let
     BACKUP_DIR=${cfg.backup.backupDir}
     mkdir -p "$BACKUP_DIR"
 
+    # Clean up partial archives left behind by previous failed runs
+    rm -f "$BACKUP_DIR"/world-*.tar.gz.tmp
+
     STAMP=$(${pkgs.coreutils}/bin/date +%Y%m%d-%H%M%S)
     OUT="$BACKUP_DIR/world-$STAMP.tar.gz"
 
-    # Save a snapshot of the world directory.
-    ${pkgs.gnutar}/bin/tar -czf "$OUT.tmp" -C ${cfg.dataDir} ${lib.concatStringsSep " " cfg.backup.worldDirs}
+    # Save a snapshot of the world directory. Explicit gzip binary —
+    # tar's -z shells out to "gzip" which isn't on the systemd unit's PATH.
+    ${pkgs.gnutar}/bin/tar --use-compress-program="${pkgs.gzip}/bin/gzip" \
+      -cf "$OUT.tmp" -C ${cfg.dataDir} ${lib.concatStringsSep " " cfg.backup.worldDirs}
     mv "$OUT.tmp" "$OUT"
 
     # Retention: delete backups older than `retentionDays` days.
@@ -229,6 +304,46 @@ in
       description = "Time window (seconds) that maxRestarts applies to.";
     };
 
+    ops = lib.mkOption {
+      type = lib.types.listOf (lib.types.submodule {
+        options = {
+          name = lib.mkOption {
+            type = lib.types.strMatching "[A-Za-z0-9_]{1,16}";
+            description = "Minecraft username of the operator.";
+          };
+          uuid = lib.mkOption {
+            type = lib.types.nullOr (lib.types.strMatching "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+            default = null;
+            description = ''
+              Offline-lookup-resistant uuid (dashed). If null, resolved from
+              the username via the Mojang API on startup and cached.
+            '';
+          };
+          level = lib.mkOption {
+            type = lib.types.nullOr (lib.types.ints.between 1 4);
+            default = null;
+            description = "Op level (1-4). Default 4 (full permissions).";
+          };
+          bypassesPlayerLimit = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Allow this op to join even when the server is full.";
+          };
+        };
+      });
+      default = [ ];
+      example = [
+        { name = "johndikeman"; }
+        { name = "Cameron"; level = 3; }
+      ];
+      description = ''
+        Players granted operator status. Written to ops.json in dataDir on
+        startup; usernames are resolved to uuids via the Mojang API
+        (results cached in .ops-resolved.json). Requires internet access at
+        startup — provide `uuid` explicitly for fully offline setups.
+      '';
+    };
+
     port = lib.mkOption {
       type = lib.types.port;
       default = 25565;
@@ -281,6 +396,14 @@ in
   config = lib.mkIf cfg.enable {
     # Open the Minecraft port
     networking.firewall.allowedTCPPorts = [ cfg.port ];
+
+    # Pre-create state dirs with correct ownership. Without this, the
+    # pre-start's mkdir fails (service user can't write to /var/lib), and
+    # the backup script can't write to backupDir.
+    systemd.tmpfiles.rules = [
+      "d '${cfg.dataDir}' 0750 ${cfg.user} ${cfg.group} - -"
+      "d '${cfg.backup.backupDir}' 0750 ${cfg.user} ${cfg.group} - -"
+    ];
     networking.firewall.allowedUDPPorts = [ 24454 ];
 
     systemd.services.mcserver = {
