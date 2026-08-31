@@ -16,6 +16,7 @@
     (modulesPath + "/installer/scan/not-detected.nix")
     ../modules/mcserver.nix
     ../users/john.nix
+    ../hardware-configuration.nix
 
     # Disk layout, used by nixos-anywhere to wipe + partition.
     # WARNING: nixos-anywhere will ERASE the disk this points at.
@@ -28,13 +29,8 @@
   boot.loader.efi.canTouchEfiVariables = true;
 
   # ----- Kernel / hardware -----
-  boot.initrd.availableKernelModules = [
-    "xhci_pci"
-    "ahci"
-    "nvme"
-    "usbhid"
-  ];
-  boot.initrd.kernelModules = [ ];
+  # Real initrd/kernel modules come from hardware-configuration.nix,
+  # generated on the target by nixos-anywhere (see that file).
   boot.kernelModules = [ "kvm-intel" ];
   boot.extraModulePackages = [ ];
 
@@ -61,6 +57,12 @@
     enable = true;
     allowedTCPPorts = [ 22 ];
     # 25565 opened by services.mcserver
+  };
+
+  # ----- SSH (required: deploy-rs and post-install access connect as root) -----
+  services.openssh = {
+    enable = true;
+    settings.PasswordAuthentication = false;
   };
 
   # ----- The game server -----

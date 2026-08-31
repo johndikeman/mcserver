@@ -39,7 +39,10 @@
       nixosModules.default = self.nixosModules.mcserver;
 
       # The actual box (Cameron's server). Installs with nixos-anywhere:
-      #   nixos-anywhere --flake .#mcserver root@<host>
+      #   nixos-anywhere \
+      #     --generate-hardware-config nixos-generate-config ./hardware-configuration.nix \
+      #     --flake .#mcserver --target-host root@<host>
+      # (regenerates ./hardware-configuration.nix for the real machine)
       nixosConfigurations.mcserver = nixpkgs.lib.nixosSystem {
         inherit system;
         modules = [
