@@ -39,9 +39,7 @@
       nixosModules.default = self.nixosModules.mcserver;
 
       # The actual box (Cameron's server). Installs with nixos-anywhere:
-      #   nixos-anywhere \
-      #     --generate-hardware-config nixos-generate-config ./hardware-configuration.nix \
-      #     --flake .#mcserver --target-host root@<host>
+      #   nix run github:nix-community/nixos-anywhere -- --generate-hardware-config nixos-generate-config ./hardware-configuration.nix --flake .#mcserver --target-host root@<IP>
       # (regenerates ./hardware-configuration.nix for the real machine)
       nixosConfigurations.mcserver = nixpkgs.lib.nixosSystem {
         inherit system;
@@ -52,8 +50,7 @@
       };
 
       deploy.nodes.mcserver = {
-        # Cameron's public IP or hostname (see DDNS note in CAMERON.md)
-        hostname = "FILL_ME_IN";
+        hostname = "mcserver";
         autoRollback = true;
         magicRollback = true;
         profiles.system = {

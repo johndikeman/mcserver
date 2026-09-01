@@ -36,6 +36,10 @@
   hardware.enableRedistributableFirmware = true;
   # RAM disk for the modded server heap; let nix detect zram/etc later
   zramSwap.enable = true;
+  nix.settings.experimental-features = [
+    "nix-command"
+    "flakes"
+  ];
 
   # ----- Networking -----
   networking.hostName = "mcserver";
