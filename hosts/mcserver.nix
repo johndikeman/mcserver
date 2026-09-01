@@ -22,8 +22,6 @@
     # WARNING: nixos-anywhere will ERASE the disk this points at.
     ../disko.nix
   ];
-  disko.devices.disk.main.device = "/dev/nvme0n1";
-
   # ----- Boot -----
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
@@ -74,4 +72,3 @@
     serverPackVersion = "v1";
   };
 }
-
