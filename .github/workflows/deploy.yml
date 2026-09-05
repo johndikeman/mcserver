@@ -3,12 +3,12 @@ name: Deploy VPS
 on:
   push:
     branches:
-      - vps_nix
+      - main
   workflow_dispatch:
 
 jobs:
   deploy:
-    name: Deploy Home Manager Profile
+    name: Deploy nixos
     runs-on: ubuntu-latest
 
     steps:
