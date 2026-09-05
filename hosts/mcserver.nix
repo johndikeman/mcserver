@@ -72,7 +72,7 @@
     enable = true;
     # Server pack files are rsynced into /var/lib/mcserver after install;
     # with serverPackUrl = null the pre-start script skips downloading.
-    serverPackUrl = "https://github.com/johndikeman/mcserver/releases/download/v1/server.zip";
-    serverPackVersion = "v1";
+    serverPackUrl = "https://github.com/johndikeman/mcserver/releases/download/v1.1/server.zip";
+    serverPackVersion = "v1.1";
   };
 }
