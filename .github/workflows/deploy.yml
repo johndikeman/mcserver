@@ -1,0 +1,57 @@
+name: Deploy VPS
+
+on:
+  push:
+    branches:
+      - vps_nix
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Home Manager Profile
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          VPS_IP: "op://mcserver GHA/cameron nixos/URL"
+          VPS_USER: "op://mcserver GHA/cameron nixos/username"
+          SSH_PRIVATE_KEY: "op://mcserver GHA/lksd7dpqfixlmkb5cr4pguzd4m/private key"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ env.SSH_PRIVATE_KEY }}
+
+      - name: Configure SSH Host
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          ssh-keyscan -H ${{ env.VPS_IP }} >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+          cat <<EOF > ~/.ssh/config
+          Host vps
+            HostName ${{ env.VPS_IP }}
+            User ${{ env.VPS_USER }}
+            StrictHostKeyChecking no
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Deploy via deploy-rs
+        run: |
+          nix run github:johndikeman/deploy-rs -- --remote-build --debug-logs --hostname ${{ env.VPS_IP }} --ssh-user ${{ env.VPS_USER }} .#mcserver
