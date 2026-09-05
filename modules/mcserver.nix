@@ -147,7 +147,7 @@ let
   # Main entry: run the server with the FIFO as stdin.
   mcStart = pkgs.writeShellScript "mcserver-start" ''
     cd ${cfg.dataDir}
-    exec ${java}/bin/java @user_jvm_args.txt @libraries/net/neoforged/neoforge/${cfg.neoforgeVersion}/unix_args.txt nogui < /run/mcserver/stdin
+    exec ${java}/bin/java -Dfml.readTimeout=120 -Dfml.loginTimeout=120 -Xmx8G @user_jvm_args.txt @libraries/net/neoforged/neoforge/${cfg.neoforgeVersion}/unix_args.txt nogui < /run/mcserver/stdin
   '';
 
   # Graceful shutdown: send "stop" to the server console via the FIFO.
