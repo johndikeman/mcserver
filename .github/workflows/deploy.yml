@@ -23,7 +23,7 @@ jobs:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           VPS_IP: "op://mcserver GHA/cameron nixos/URL"
           VPS_USER: "op://mcserver GHA/cameron nixos/username"
-          SSH_PRIVATE_KEY: "op://mcserver GHA/lksd7dpqfixlmkb5cr4pguzd4m/private key"
+          SSH_PRIVATE_KEY: "op://mcserver GHA/mcserver GHA openssh key/credential"
 
       - name: Install Nix
         uses: cachix/install-nix-action@v27
