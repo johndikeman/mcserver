@@ -23,25 +23,13 @@ jobs:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           VPS_IP: "op://mcserver GHA/cameron nixos/URL"
           VPS_USER: "op://mcserver GHA/cameron nixos/username"
-          SSH_PRIVATE_KEY: "op://mcserver GHA/mcserver GHA openssh key/credential"
+          SSH_PRIVATE_KEY: "op://mcserver GHA/5ljhk7tnwxtxdmqe42mts244ju/credential"
 
       - name: Install Nix
         uses: cachix/install-nix-action@v27
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
-
-      - name: Debug ssh-add directly
-        run: |
-          ssh -V
-          eval $(ssh-agent)
-          echo "--- test with trailing newline ---"
-          printf '%s\n' "$SSH_PRIVATE_KEY" | ssh-add - && echo WITH-NEWLINE-OK
-          ssh-add -l || true
-          ssh-add -D || true
-          echo "--- test without trailing newline ---"
-          printf '%s' "$SSH_PRIVATE_KEY" | ssh-add - && echo WITHOUT-NEWLINE-OK
-          ssh-add -l || true
 
       - name: Setup SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
