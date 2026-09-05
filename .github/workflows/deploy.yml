@@ -31,17 +31,17 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      - name: Setup SSH Agent
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ env.SSH_PRIVATE_KEY }}
-
       - name: Debug SSH key fingerprint
         run: |
           echo "lines: $(printf '%s\n' "$SSH_PRIVATE_KEY" | wc -l)"
           echo "bytes: $(printf '%s' "$SSH_PRIVATE_KEY" | wc -c)"
           echo "md5: $(printf '%s' "$SSH_PRIVATE_KEY" | md5sum | cut -d' ' -f1)"
           echo "CR count: $(printf '%s' "$SSH_PRIVATE_KEY" | tr -dc '\r' | wc -c)"
+
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ env.SSH_PRIVATE_KEY }}
 
       - name: Configure SSH Host
         run: |
